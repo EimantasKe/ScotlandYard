@@ -1,11 +1,7 @@
 package uk.ac.bris.cs.scotlandyard.model;
 
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptySet;
-import static java.util.Collections.singletonList;
-import static java.util.Collections.unmodifiableCollection;
-import static java.util.Collections.unmodifiableList;
-import static java.util.Collections.unmodifiableSet;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static uk.ac.bris.cs.scotlandyard.model.Colour.BLACK;
 import static uk.ac.bris.cs.scotlandyard.model.Ticket.DOUBLE;
@@ -18,16 +14,20 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import com.google.common.collect.ImmutableList;
+import org.apache.commons.lang3.ObjectUtils;
 import uk.ac.bris.cs.gamekit.graph.Edge;
 import uk.ac.bris.cs.gamekit.graph.Graph;
 import uk.ac.bris.cs.gamekit.graph.ImmutableGraph;
-
 import javax.security.auth.login.Configuration;
 
 // TODO implement all methods and pass all tests
 public class ScotlandYardModel implements ScotlandYardGame {
 	List<Boolean> rounds;
-	Graph<Integer, Transport> graph;
+	private Graph<Integer, Transport> graph;
+	List<ScotlandYardPlayer> players;
+	private int index = 0;
+	private int roundNo = 0;
 
 	public ScotlandYardModel(List<Boolean> rounds, Graph<Integer, Transport> graph,
 			PlayerConfiguration mrX, PlayerConfiguration firstDetective,
@@ -75,20 +75,34 @@ public class ScotlandYardModel implements ScotlandYardGame {
 			set2.add(configuration.colour);
 		}
 
-
-		//Map<Ticket, Integer> tickets;
-		//BORKED
-		/*for(PlayerConfiguration configuration : configurations){
-			Set<Ticket> set = new HashSet<>();
-			for(configuration.tickets ticket : tickets){
-				if (set.contains(ticket)
-				throw new IllegalArgumentException("Duplicate tickets");
-				set.add(ticket);
+		for(PlayerConfiguration configuration : configurations) {
+			if(configuration.tickets.get(DOUBLE) != null && configuration.tickets.get(SECRET) != null) {
+				if (!configuration.colour.equals(BLACK) && configuration.tickets.get(DOUBLE).compareTo(0) > 0)
+					throw new IllegalArgumentException("DetectiveHaveDoubleTicket");
+				if (!configuration.colour.equals(BLACK) && configuration.tickets.get(SECRET).compareTo(0) > 0)
+					throw new IllegalArgumentException("DetectiveHaveSecretTicket");
+				if (configuration.colour.equals(BLACK) && !(configuration.tickets.get(DOUBLE).compareTo(0) > 0))
+					throw new IllegalArgumentException("MrXMissingAnyTickets");
+				if (configuration.colour.equals(BLACK) && !(configuration.tickets.get(SECRET).compareTo(0) > 0))
+					throw new IllegalArgumentException("MrXMissingAnyTickets");
 			}
+			for (Ticket ticket : Ticket.values()) {
+				if (configuration.tickets.get(ticket) != null) {
+					if (!(configuration.tickets.get(ticket).compareTo(0) > 0) && !ticket.equals(SECRET) && !ticket.equals(DOUBLE)) {
+						throw new IllegalArgumentException("DetectiveMissingAnyTickets && MrXMissingAnyTickets");
+					}
+				}else{
+					throw new IllegalArgumentException("tickets are null");
+				}
 
-		}*/
+			}
+		}
 
 
+		players = new ArrayList<>();
+		for(PlayerConfiguration configuration : configurations){
+			this.players.add(new ScotlandYardPlayer(configuration.player,configuration.colour,configuration.location,configuration.tickets));
+		}
 	}
 
 	@Override
@@ -117,14 +131,12 @@ public class ScotlandYardModel implements ScotlandYardGame {
 
 	@Override
 	public List<Colour> getPlayers() {
-		// TODO
-		/*List<Colour> list = new List<>();
-		for (PlayerConfiguration configuration : configurations) {
-			if (list.contains(configuration.colour))
-				throw new IllegalArgumentException("Duplicate colour");
-			list.add(configuration.colour);
-		}*/
-		throw new RuntimeException("Implement me");
+		List<Colour> list = new ArrayList<>();
+		List<ScotlandYardPlayer> playersImmutable = players;
+		for (ScotlandYardPlayer player : playersImmutable) {
+			list.add(player.colour());
+		}
+		return Collections.unmodifiableList(list);
 	}
 
 	@Override
@@ -148,32 +160,39 @@ public class ScotlandYardModel implements ScotlandYardGame {
 	@Override
 	public boolean isGameOver() {
 		// TODO
+		//List<> currentPlayer = getPlayerLocation();
 		throw new RuntimeException("Implement me");
 	}
 
 	@Override
 	public Colour getCurrentPlayer() {
-		// TODO
-		throw new RuntimeException("Implement me");
+		/*int temp = index;
+		index = index++;
+		if(index == players.size()){
+			index = 0;
+		}*/
+		return players.get(index).colour();
 	}
 
 	@Override
 	public int getCurrentRound() {
-		// TODO
-		throw new RuntimeException("Implement me");
+		/*if(roundNo){
+			roundNo = 0;
+		}
+		if(getCurrentPlayer().equals(BLACK)){
+			roundNo++;
+		}*/
+		return roundNo;
 	}
 
 	@Override
 	public List<Boolean> getRounds() {
-		// TODO
 		return Collections.unmodifiableList(rounds);
-		//throw new RuntimeException("Implement me");
 	}
 
 	@Override
 	public Graph<Integer, Transport> getGraph() {
-		// TODO
-		throw new RuntimeException("Implement me");
+		return new ImmutableGraph<>(graph);
 	}
 
 }
