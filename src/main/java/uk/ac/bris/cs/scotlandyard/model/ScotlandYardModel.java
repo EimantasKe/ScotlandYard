@@ -1,15 +1,13 @@
 package uk.ac.bris.cs.scotlandyard.model;
 
+import java.util.Arrays;
+
 import static java.util.Arrays.asList;
-import static java.util.Collections.emptySet;
-import static java.util.Collections.singletonList;
-import static java.util.Collections.unmodifiableCollection;
-import static java.util.Collections.unmodifiableList;
-import static java.util.Collections.unmodifiableSet;
+import static java.util.Collections.*;
 import static java.util.Objects.requireNonNull;
 import static uk.ac.bris.cs.scotlandyard.model.Colour.BLACK;
-import static uk.ac.bris.cs.scotlandyard.model.Ticket.DOUBLE;
-import static uk.ac.bris.cs.scotlandyard.model.Ticket.SECRET;
+import static uk.ac.bris.cs.scotlandyard.model.Ticket.*;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -18,16 +16,24 @@ import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Consumer;
+import com.google.common.collect.ImmutableList;
+//import com.sun.org.apache.xalan.internal.xsltc.runtime.Node;
+import org.apache.commons.lang3.ObjectUtils;
 import uk.ac.bris.cs.gamekit.graph.Edge;
 import uk.ac.bris.cs.gamekit.graph.Graph;
 import uk.ac.bris.cs.gamekit.graph.ImmutableGraph;
-
 import javax.security.auth.login.Configuration;
 
 // TODO implement all methods and pass all tests
-public class ScotlandYardModel implements ScotlandYardGame {
+public class ScotlandYardModel implements ScotlandYardGame, Consumer<Move> {
 	List<Boolean> rounds;
-	Graph<Integer, Transport> graph;
+	private Graph<Integer, Transport> graph;
+	List<ScotlandYardPlayer> players;
+	private int index = 0;
+	private int roundNo = 0;
+	Set<Move> moves = new HashSet<>();
+	private final List<Spectator> spectators = new ArrayList<>();
+	Reader reader = new Reader();
 
 	public ScotlandYardModel(List<Boolean> rounds, Graph<Integer, Transport> graph,
 			PlayerConfiguration mrX, PlayerConfiguration firstDetective,
@@ -75,105 +81,245 @@ public class ScotlandYardModel implements ScotlandYardGame {
 			set2.add(configuration.colour);
 		}
 
-
-		//Map<Ticket, Integer> tickets;
-		//BORKED
-		/*for(PlayerConfiguration configuration : configurations){
-			Set<Ticket> set = new HashSet<>();
-			for(configuration.tickets ticket : tickets){
-				if (set.contains(ticket)
-				throw new IllegalArgumentException("Duplicate tickets");
-				set.add(ticket);
+		for(PlayerConfiguration configuration : configurations) {
+			if(configuration.tickets.get(DOUBLE) != null && configuration.tickets.get(SECRET) != null) {
+				if (!configuration.colour.equals(BLACK) && configuration.tickets.get(DOUBLE).compareTo(0) > 0)
+					throw new IllegalArgumentException("DetectiveHaveDoubleTicket");
+				if (!configuration.colour.equals(BLACK) && configuration.tickets.get(SECRET).compareTo(0) > 0)
+					throw new IllegalArgumentException("DetectiveHaveSecretTicket");
+				if (configuration.colour.equals(BLACK) && !(configuration.tickets.get(DOUBLE).compareTo(0) > 0))
+					throw new IllegalArgumentException("MrXMissingAnyTickets");
+				if (configuration.colour.equals(BLACK) && !(configuration.tickets.get(SECRET).compareTo(0) > 0))
+					throw new IllegalArgumentException("MrXMissingAnyTickets");
 			}
+			for (Ticket ticket : Ticket.values()) {
+				if (configuration.tickets.get(ticket) != null) {
+					if (!(configuration.tickets.get(ticket).compareTo(0) > 0) && !ticket.equals(SECRET) && !ticket.equals(DOUBLE)) {
+						throw new IllegalArgumentException("DetectiveMissingAnyTickets && MrXMissingAnyTickets");
+					}
+				}else{
+					throw new IllegalArgumentException("tickets are null");
+				}
 
-		}*/
+			}
+		}
 
 
+		players = new ArrayList<>();
+		for(PlayerConfiguration configuration : configurations){
+			this.players.add(new ScotlandYardPlayer(configuration.player,configuration.colour,configuration.location,configuration.tickets));
+		}
 	}
+
+
 
 	@Override
 	public void registerSpectator(Spectator spectator) {
-		// TODO
-		throw new RuntimeException("Implement me");
+		this.spectators.add(spectator);
 	}
 
 	@Override
 	public void unregisterSpectator(Spectator spectator) {
-		// TODO
-		throw new RuntimeException("Implement me");
+		this.spectators.remove(spectator);
 	}
 
 	@Override
 	public void startRotate() {
-		// TODO
-		throw new RuntimeException("Implement me");
+		moves = validMove(getCurrentPlayer());
+		for(Move movez : moves){
+			System.out.println(movez.toString());
+		}
+		if(moves.isEmpty()){
+			throw new RuntimeException("");
+		}
+		for(ScotlandYardPlayer player : players){
+			if(player.colour().equals(getCurrentPlayer())){
+				player.player().makeMove(this, player.location(), moves, this);
+				index++;
+				if(index == players.size()){
+					index=0;
+				}
+				//if(player.colour().equals(players.get(players.size()-1).colour())){ roundNo++; }
+				if(player.isMrX()){ roundNo++; }
+			}
+		}
+	}
+	private Set<Move> validMove(Colour player) {
+		try {
+			reader.read("C:\\Users\\Eimantas\\Desktop\\cw-model\\src\\main\\resources\\graph.txt"); //TODO: change input path
+			Graph<Integer, Integer> graph = reader.graph();
+		}catch (Exception e){
+			//TODO: catch
+		}
+
+		Set<Move> validMoves = new HashSet<>();
+		for(ScotlandYardPlayer play:players) {
+			if(play.colour().equals(player)){
+				Collection<Edge<Integer, Transport>> edgesFrom = graph.getEdgesFrom(graph.getNode(play.location()));
+				//TODO: add TicketMove
+				for(Edge<Integer,Transport> edge : edgesFrom){
+					if(fromTransport(edge.data()).equals(TAXI) && play.hasTickets(TAXI)){
+						validMoves.add(new TicketMove(player,TAXI,edge.destination().value()));
+					}else if(fromTransport(edge.data()).equals(BUS) && play.hasTickets(BUS)){
+						validMoves.add(new TicketMove(player,BUS,edge.destination().value()));
+					}else if(fromTransport(edge.data()).equals(UNDERGROUND) && play.hasTickets(UNDERGROUND)){
+						validMoves.add(new TicketMove(player,UNDERGROUND,edge.destination().value()));
+					}else if(fromTransport(edge.data()).equals(SECRET) && play.hasTickets(SECRET)){
+						validMoves.add(new TicketMove(player,SECRET,edge.destination().value()));
+					}
+				}
+
+				//TODO: add DoubleMove
+				if (player.isMrX()){
+					for(Edge<Integer,Transport> edge : edgesFrom){
+						if(fromTransport(edge.data()).equals(TAXI) && play.hasTickets(TAXI)){
+							Collection<Edge<Integer, Transport>> edgesFromFrom = graph.getEdgesFrom(graph.getNode(edge.destination().hashCode()));
+							for(Edge<Integer,Transport> edge1 : edgesFromFrom){
+								if(fromTransport(edge1.data()).equals(TAXI) && play.hasTickets(TAXI)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,TAXI,edge.destination().value()), new TicketMove(player,TAXI,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(BUS) && play.hasTickets(BUS)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,TAXI,edge.destination().value()), new TicketMove(player,BUS,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(UNDERGROUND) && play.hasTickets(UNDERGROUND)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,TAXI,edge.destination().value()), new TicketMove(player,UNDERGROUND,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(SECRET) && play.hasTickets(SECRET)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,TAXI,edge.destination().value()), new TicketMove(player,SECRET,edge1.destination().value())));
+								}
+							}
+						}else if(fromTransport(edge.data()).equals(BUS) && play.hasTickets(BUS)){
+							Collection<Edge<Integer, Transport>> edgesFromFrom = graph.getEdgesFrom(graph.getNode(edge.destination().hashCode()));
+							for(Edge<Integer,Transport> edge1:edgesFromFrom){
+								if(fromTransport(edge1.data()).equals(TAXI) && play.hasTickets(TAXI)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,BUS,edge.destination().value()), new TicketMove(player,TAXI,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(BUS) && play.hasTickets(BUS)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,BUS,edge.destination().value()), new TicketMove(player,BUS,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(UNDERGROUND) && play.hasTickets(UNDERGROUND)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,BUS,edge.destination().value()), new TicketMove(player,UNDERGROUND,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(SECRET) && play.hasTickets(SECRET)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,BUS,edge.destination().value()), new TicketMove(player,SECRET,edge1.destination().value())));
+								}
+							}
+						}else if(fromTransport(edge.data()).equals(UNDERGROUND) && play.hasTickets(UNDERGROUND)){
+							Collection<Edge<Integer, Transport>> edgesFromFrom = graph.getEdgesFrom(graph.getNode(edge.destination().hashCode()));
+							for(Edge<Integer,Transport> edge1:edgesFromFrom){
+								if(fromTransport(edge1.data()).equals(TAXI) && play.hasTickets(TAXI)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,UNDERGROUND,edge.destination().value()), new TicketMove(player,TAXI,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(BUS) && play.hasTickets(BUS)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,UNDERGROUND,edge.destination().value()), new TicketMove(player,BUS,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(UNDERGROUND) && play.hasTickets(UNDERGROUND)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,UNDERGROUND,edge.destination().value()), new TicketMove(player,UNDERGROUND,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(SECRET) && play.hasTickets(SECRET)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,UNDERGROUND,edge.destination().value()), new TicketMove(player,SECRET,edge1.destination().value())));
+								}
+							}
+						}else if(fromTransport(edge.data()).equals(SECRET) && play.hasTickets(SECRET)){
+							Collection<Edge<Integer, Transport>> edgesFromFrom = graph.getEdgesFrom(graph.getNode(edge.destination().hashCode()));
+							for(Edge<Integer,Transport> edge1:edgesFromFrom){
+								if(fromTransport(edge1.data()).equals(TAXI) && play.hasTickets(TAXI)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,SECRET,edge.destination().value()), new TicketMove(player,TAXI,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(BUS) && play.hasTickets(BUS)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,SECRET,edge.destination().value()), new TicketMove(player,BUS,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(UNDERGROUND) && play.hasTickets(UNDERGROUND)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,SECRET,edge.destination().value()), new TicketMove(player,UNDERGROUND,edge1.destination().value())));
+								}else if(fromTransport(edge1.data()).equals(SECRET) && play.hasTickets(SECRET)){
+									validMoves.add(new DoubleMove(player,new TicketMove(player,SECRET,edge.destination().value()), new TicketMove(player,SECRET,edge1.destination().value())));
+								}
+							}
+						}
+					}
+				}
+				//TODO: add PassMove
+				if(validMoves.isEmpty()) {
+					validMoves.add(new PassMove(player));
+				}
+			}
+		}
+		return Collections.unmodifiableSet(validMoves);
+	}
+	@Override
+	public void accept(Move move) {
+		if (moves.isEmpty()) throw new IllegalArgumentException("empty");
+
 	}
 
 	@Override
 	public Collection<Spectator> getSpectators() {
-		// TODO
-		throw new RuntimeException("Implement me");
+		return spectators;
 	}
 
 	@Override
 	public List<Colour> getPlayers() {
-		// TODO
-		/*List<Colour> list = new List<>();
-		for (PlayerConfiguration configuration : configurations) {
-			if (list.contains(configuration.colour))
-				throw new IllegalArgumentException("Duplicate colour");
-			list.add(configuration.colour);
-		}*/
-		throw new RuntimeException("Implement me");
+		List<Colour> list = new ArrayList<>();
+		List<ScotlandYardPlayer> playersImmutable = players;
+		for (ScotlandYardPlayer player : playersImmutable) {
+			list.add(player.colour());
+		}
+		return Collections.unmodifiableList(list);
 	}
 
 	@Override
 	public Set<Colour> getWinningPlayers() {
-		// TODO
-		throw new RuntimeException("Implement me");
+		Set<Colour> set = new HashSet<>();
+		return Collections.unmodifiableSet(set);
 	}
 
 	@Override
 	public Optional<Integer> getPlayerLocation(Colour colour) {
-		// TODO
-		throw new RuntimeException("Implement me");
+		if(colour.equals(BLACK) && roundNo==0){
+			return Optional.of(0);
+		}
+		for(ScotlandYardPlayer player:players){
+			if(player.colour().equals(colour)){
+				if(player.tickets().isEmpty()){
+					return Optional.empty();
+				}else{
+					return Optional.of(player.location());
+				}
+			}
+		}
+		return Optional.empty();
 	}
 
 	@Override
 	public Optional<Integer> getPlayerTickets(Colour colour, Ticket ticket) {
-		// TODO
-		throw new RuntimeException("Implement me");
+		for(ScotlandYardPlayer player:players){
+			if(player.colour().equals(colour)){
+				if(player.tickets().isEmpty()){
+					return Optional.empty();
+				}else {
+					return Optional.of(player.tickets().get(ticket));
+
+				}
+			}
+		}
+		return Optional.empty();
 	}
 
 	@Override
 	public boolean isGameOver() {
 		// TODO
-		throw new RuntimeException("Implement me");
-	}
-
-	@Override
-	public Colour getCurrentPlayer() {
-		// TODO
-		throw new RuntimeException("Implement me");
-	}
-
-	@Override
-	public int getCurrentRound() {
-		// TODO
-		throw new RuntimeException("Implement me");
-	}
-
-	@Override
-	public List<Boolean> getRounds() {
-		// TODO
-		return Collections.unmodifiableList(rounds);
+		//List<> currentPlayer = getPlayerLocation();
+		return false;
 		//throw new RuntimeException("Implement me");
 	}
 
 	@Override
+	public Colour getCurrentPlayer() {
+		return players.get(index).colour();
+	}
+
+	@Override
+	public int getCurrentRound() {
+		return roundNo;
+	}
+
+	@Override
+	public List<Boolean> getRounds() {
+		return Collections.unmodifiableList(rounds);
+	}
+
+	@Override
 	public Graph<Integer, Transport> getGraph() {
-		// TODO
-		throw new RuntimeException("Implement me");
+		return new ImmutableGraph<>(graph);
 	}
 
 }
