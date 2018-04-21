@@ -31,9 +31,10 @@ import javax.security.auth.login.Configuration;
 //Reader: reads undirected graph from file system, simple format
 public class Reader
 {
-    private Graph<Integer,Integer> graph;
+    private Graph<Integer,Transport> graph;
 
     public Graph<Integer,Integer> graph() {
+    public Graph<Integer,Transport> graph() {
       return graph;
     }
     
@@ -41,7 +42,8 @@ public class Reader
     {
  	
     	// initialise the graph
-    	graph = new UndirectedGraph<Integer,Integer>();
+    	//graph = new UndirectedGraph<Integer,Integer>();
+    	graph = new UndirectedGraph<Integer,Transport>();
     	
     	// load the file
         File file = new File(filename);
@@ -92,18 +94,18 @@ public class Reader
             String[] names = line.split(" ");
             String id1 = names[0];
             String id2 = names[1];
-            Integer type;
+            Transport type;
             if(names[2].equals("Taxi")){
-                type = 0;
+                type = Transport.TAXI;
             }else if(names[2].equals("Bus")){
-                type = 1;
+                type = Transport.BUS;
             }else if(names[2].equals("Underground")){
-                type = 2;
+                type = Transport.UNDERGROUND;
             }else{
-                type = 3;
+                type = Transport.FERRY;
             }
-            Edge<Integer,Integer> edge = new Edge<Integer,Integer>(graph.getNode(Integer.parseInt(id1)),graph.getNode(Integer.parseInt(id2)),new Integer(type));
-            if (type==0) {
+            Edge<Integer,Transport> edge = new Edge<Integer,Transport>(graph.getNode(Integer.parseInt(id1)),graph.getNode(Integer.parseInt(id2)),type);
+            if (type.equals(Transport.TAXI)) {
                 graph.addEdge(edge);
             }
         }
