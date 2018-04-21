@@ -88,16 +88,16 @@ public class ScotlandYardModel implements ScotlandYardGame, Consumer<Move> {
 				if (!configuration.colour.equals(BLACK) && configuration.tickets.get(SECRET).compareTo(0) > 0)
 					throw new IllegalArgumentException("DetectiveHaveSecretTicket");
 				if (configuration.colour.equals(BLACK) && !(configuration.tickets.get(DOUBLE).compareTo(0) > 0)) {
-					throw new IllegalArgumentException("MrXMissingAnyTickets");
+					//throw new IllegalArgumentException("MrXMissingAnyTickets");
 				}
 				if (configuration.colour.equals(BLACK) && !(configuration.tickets.get(SECRET).compareTo(0) > 0)) {
-					throw new IllegalArgumentException("MrXMissingAnyTickets");
+					//throw new IllegalArgumentException("MrXMissingAnyTickets");
 				}
 			}
 			for (Ticket ticket : Ticket.values()) {
 				if (configuration.tickets.get(ticket) != null) {
 					if (!(configuration.tickets.get(ticket).compareTo(0) > 0) && !ticket.equals(SECRET) && !ticket.equals(DOUBLE)) {
-						throw new IllegalArgumentException("DetectiveMissingAnyTickets && MrXMissingAnyTickets");
+						//throw new IllegalArgumentException("DetectiveMissingAnyTickets && MrXMissingAnyTickets");
 					}
 				}else{
 					throw new IllegalArgumentException("tickets are null");

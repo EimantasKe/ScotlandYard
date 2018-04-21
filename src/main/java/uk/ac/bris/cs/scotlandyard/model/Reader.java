@@ -33,7 +33,6 @@ public class Reader
 {
     private Graph<Integer,Transport> graph;
 
-    public Graph<Integer,Integer> graph() {
     public Graph<Integer,Transport> graph() {
       return graph;
     }
